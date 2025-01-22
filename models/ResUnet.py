@@ -18,6 +18,8 @@ class ConvBlock(nn.Module):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, padding=padding, kernel_size=kernel_size, stride=stride)
         self.bn = nn.BatchNorm2d(out_channels)
+        #self.bn = nn.GroupNorm(num_groups=32, num_channels=out_channels)
+
         self.relu = nn.ReLU()
         self.with_nonlinearity = with_nonlinearity
 
@@ -143,7 +145,7 @@ class UNetWithResnet50Encoder(nn.Module):
 
 if __name__=="__main__":
     model = UNetWithResnet50Encoder(25).cuda()
-    input = torch.ones((1,10,1024,1024)).cuda()
+    input = torch.ones((1,3,1024,1024)).cuda()
     out = model(input)
     print(out.size())
     # summary(model,(1, 1024,1024), batch_size=4)

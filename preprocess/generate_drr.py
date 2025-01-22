@@ -44,7 +44,7 @@ def plastimatch_drr(input_file, output_dir):
         'proj_phy': [2048,2048],#proj_phy.tolist(),
         'isocenter': isocenter.tolist(),
     }
-    command = f'plastimatch drr -a {params["N_views"]} --sad {params["sad"]} --sid {params["sid"]}  -r "{params["proj_resolution"][0]} {params["proj_resolution"][1]}" -z "{params["proj_phy"][0]} {params["proj_phy"][1]}" -o "{params["isocenter"][0]} {params["isocenter"][1]} {params["isocenter"][2]}" -I {input_file} -O {output_dir} -t raw --autoscale --autoscale-range "0 255"'
+    command = f'/projects/MAD3D/Zhuoli/MICCAI/clean_code/plastimatch_build_new/plastimatch drr -a {params["N_views"]} --sad {params["sad"]} --sid {params["sid"]}  -r "{params["proj_resolution"][0]} {params["proj_resolution"][1]}" -z "{params["proj_phy"][0]} {params["proj_phy"][1]}" -o "{params["isocenter"][0]} {params["isocenter"][1]} {params["isocenter"][2]}" -I {input_file} -O {output_dir} -t raw --autoscale --autoscale-range "0 255"'
     print(command)
     os.system(f'{command}')
     params['command'] = command
@@ -77,18 +77,20 @@ def raw2nii_png(src, dst_nii, dst_png, H, W, phyH, phyW):
 
 
 if __name__=="__main__":
-    mode_all = ["train"] #  
+    #mode_all = ["dataset-verse19training"] #  
+    mode_all = ["dataset-verse19validation", "dataset-verse19test"] #  
     for mode in mode_all:
-        base_path = "D:/Data/VerSe/VerSe19/verse19" + mode + "/enhance_ct_8/"
+        base_path = "/projects/MAD3D/Zhuoli/MICCAI/VerSe2019/" + mode + "/"
 
-        air_ct_path = os.path.join(base_path, "ct")
+        air_ct_path = os.path.join(base_path, "rawdata")
         air_ct_list = os.listdir(air_ct_path)
         air_ct_list.sort()
 
         for i,air_ct in enumerate(air_ct_list):
-            ct_path = os.path.join(air_ct_path, air_ct)
-            save_path = os.path.join(base_path,"enhance_drr","drr_"+air_ct[-9:-7]+"/")
-            os.makedirs(save_path, exist_ok=True)
-            plastimatch_drr(ct_path, save_path)
-            break
+            for ct_sub in os.listdir(os.path.join(air_ct_path,air_ct)):
+                ct_path = os.path.join(air_ct_path, air_ct, ct_sub)
+                save_path = os.path.join(base_path,"enhance_drr","drr_"+air_ct+"/")
+                os.makedirs(save_path, exist_ok=True)
+                plastimatch_drr(ct_path, save_path)
+                break
     

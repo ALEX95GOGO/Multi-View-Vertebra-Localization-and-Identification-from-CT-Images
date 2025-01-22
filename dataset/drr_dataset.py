@@ -49,6 +49,7 @@ class drr_dataset(dataset):
 
 
     def __getitem__(self, index):
+        #print(self.data[index][0])
         img = sitk.ReadImage(self.data[index][0])
         heatmap = sitk.ReadImage(self.data[index][1])        
         ids = self.data[index][2]
@@ -132,6 +133,7 @@ class drr_dataset(dataset):
                 if not lines:
                     break
                 file_name_list.append(lines.split("*"))
+        #print(file_name_list)
         return file_name_list 
 
 

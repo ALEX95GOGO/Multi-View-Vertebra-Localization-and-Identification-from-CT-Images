@@ -12,7 +12,7 @@ import SimpleITK as sitk
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.DPCA import Get_Local_Density,Get_Each_Center_Distance,Choose_Cluster_Centers
-
+import glob
 
 class log_writer():
     def __init__(self, txt_name = ""):
@@ -144,6 +144,19 @@ def read_model(params_path):
         model.train()
     return model
 
+def replace_path_with_number(old_path):
+
+    path_parts = old_path.split('/')
+    # Extract the filename and numerical part
+    original_file = path_parts[-1]
+    number_part = int(original_file.split('.')[0])  # Convert '0000' to integer 0
+    #import pdb; pdb.set_trace() 
+    # Construct the new filename and path
+    new_file = f"{path_parts[-3]}_{number_part}.txt"  # Use the subfolder name and extracted number
+    new_path = os.path.join('/'.join(path_parts[:-2]), "heatmap", new_file)
+    
+    return new_path
+
 def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name, 
                   valid_thresh, cut_distance, density, distance,
                   n_views = 10, if_read_infer=False, if_read_gt=False ):
@@ -158,26 +171,30 @@ def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
     drr_list = os.listdir(drr_path)
     drr_list.sort()
 
-    ct_path = base_path + "enhance_ct/"
+    #ct_path = base_path + "enhance_ct/"
+    ct_path = base_path + "rawdata/"
     ct_list = os.listdir(ct_path)
     ct_list.sort()
     ct_size = []
     for ct_file in ct_list:
         ct_file_path = os.path.join(ct_path, ct_file)
-        ct = sitk.ReadImage(ct_file_path)
+        ct_sub_file = os.listdir(ct_file_path)[0]
+        ct = sitk.ReadImage(os.path.join(ct_file_path, ct_sub_file))
         ct_size.append(ct.GetSize())
     
     if if_read_gt:
         infer_centroids_2d = read_json(save_path+mode + "_2d_centroids_gt_"+ str(n_views) +"views.json")
     else:
         if if_read_infer: 
-            infer_centroids_2d = read_json(save_path+mode+"_2d_centroids.json")
+            pass
+            #infer_centroids_2d = read_json(save_path+mode+"_2d_centroids.json")
 
     r = 5
     class_num = 25
     pred_all = {}
     for j in tqdm(range(len(drr_list))):
         drr_folder = drr_list[j]
+        print(drr_folder)
         isocenter_file = open(os.path.join(drr_path, drr_folder, "isocenter.txt"), 'r')
         isocenter = isocenter_file.readline().split(",")
         new_isocenter = []
@@ -194,7 +211,8 @@ def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
         niis = os.listdir(drr_nii_path)
         niis.sort()
         if not if_read_gt and not if_read_infer:
-            infer_nii_path = os.path.join(drr_folder_path, "infer")
+            #infer_nii_path = os.path.join(drr_folder_path, "infer")
+            infer_nii_path = os.path.join(drr_folder_path, "nii")
             infer_niis = os.listdir(infer_nii_path)
             infer_niis.sort()
 
@@ -203,13 +221,27 @@ def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
         # localization on 10 views drr
         for i in range(len(niis)):
             if if_read_infer:
-                centroids_prediction = infer_centroids_2d[drr_folder][i]
+                #centroids_prediction = infer_centroids_2d[drr_folder][i]
+                #json_files = glob.glob(os.path.join(os.path.join(base_path, 'derivatives', drr_folder[4:]), '*.json'), recursive=True)
+                
+                #centroids_prediction = read_json(json_files[0])
+                txt_file = replace_path_with_number(os.path.join(drr_nii_path, niis[i]))
+                centroids_prediction = []
+                with open(txt_file, 'r') as file:
+                    for line in file:
+                        # Convert the string line into a list of floats
+                        pair = [float(x) for x in line.strip().strip('[]').split(',')]
+                        centroids_prediction.append(pair)
+                #centroids_prediction = read_json(os.path.join(base_path, 'derivatives', drr_folder, os.listdir(os.path.join(base_path, 'derivatives', drr_folder[4:]))[0]))
             else:
+                infer_nii_path = infer_nii_path.replace("enhance_drr", "heatmap_predict")
                 infer_path = os.path.join(infer_nii_path, infer_niis[i])
                 infer_nii = sitk.GetArrayFromImage(sitk.ReadImage(infer_path))
                 centroids_prediction = find_centroids(infer_nii, valid_thresh, cut_distance, density, distance)
+                print(len(centroids_prediction))
             centroids_predictions_2d.append(centroids_prediction)
             centroids_predictions_2d_len.append(len(centroids_prediction))
+        print(centroids_prediction) 
         tmp = np.bincount(centroids_predictions_2d_len)[1:]
         prediction_len = 0
         for num,e in enumerate(tmp):
@@ -233,8 +265,11 @@ def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
             for ii in range(centroids_predictions_2d_len[i]):
                 target = torch.zeros(img.shape[-2:])
                 x,y = centroids_predictions_2d[i][ii]
+                x = int(x)
+                y = int(y)
                 x += 1
                 y += 1
+                
                 target[(x-r):(x+r+1), (y-r):(y+r+1)] = 1
                 index = (target==1)
                 for iii in range(output.shape[0]):
@@ -289,17 +324,20 @@ def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
             start = 1
         pred_list = [i for i in range(start, start + prediction_len)]
 
-
         # mapping
         Origin,direction = [],[]
         for i in range(n_views):
             data = matrix_name_list[i]
             data_path = os.path.join(drr_folder_path, data)
+            print(data_path)
+            #import pdb; pdb.set_trace()
             Extrinsic,Intrinsic = get_two_matrix(data_path)
             tmp_o,tmp_d = get_rays(1024,1024,Intrinsic,Extrinsic)
             o,d = [], []
             for ii in range(len(centroids_predictions_2d[i])):
                 x,y = centroids_predictions_2d[i][ii]
+                x = int(x)
+                y = int(y)
                 x += 1
                 y += 1
                 o.append(tmp_o[x,y])
@@ -373,4 +411,19 @@ def infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
 
 
 
+if __name__ == "__main__":
+    base_path = '/projects/MAD3D/Zhuoli/MICCAI/VerSe2019/dataset-verse19test/'
+    drr_path = '/projects/MAD3D/Zhuoli/MICCAI/VerSe2019/dataset-verse19test/enhance_drr/' 
+    params_path = '/projects/MAD3D/Zhuoli/MICCAI/clean_code/Multi-View-Vertebra-Localization-and-Identification-from-CT-Images/checkpoints_identification/logs8_99.pth'
+    mode = 'test'
+    save_path = 'inference_save/'
+    save_name = 'fcn'
+    valid_thresh=3.0
+    cut_distance=7.0
+    density=10.0
+    distance=7.0
+    if_read_infer=False
 
+    infer_voting(base_path, drr_path, params_path, mode, save_path, save_name,
+                  valid_thresh, cut_distance, density, distance,
+                  n_views = 10, if_read_infer=if_read_infer, if_read_gt=False )

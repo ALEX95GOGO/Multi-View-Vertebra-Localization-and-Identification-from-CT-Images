@@ -30,7 +30,7 @@ class GaussianBlur(object):
         return x
 
 class drr_dataset(dataset):
-    def __init__(self, drr_path=" ", mode="train", mean_std=[[0.456,0.456,0.456], [0.224,0.224,0.224]]):
+    def __init__(self, drr_path="/projects/MAD3D/Zhuoli/MICCAI/VerSe2019/dataset-verse19training/enhance_drr/", mode="train", mean_std=[[0.456,0.456,0.456], [0.224,0.224,0.224]]):
         super().__init__()
         self.drop_list = ["drr_03"]
         self.drr_path = drr_path
@@ -117,8 +117,10 @@ class drr_dataset(dataset):
 class multi_view_dataset(dataset):
     def __init__(self, drr_path=" ", mode="train", mean_std=[[0.456,0.456,0.456], [0.224,0.224,0.224]], n_views=10):
         super().__init__()
+        
         self.drop_list = ["drr_03"]
         self.drr_path = drr_path
+        print(self.drr_path)
         self.mode = mode
         self.n_views = n_views
         self.normalize =  T.Compose([T.ToTensor(), T.Normalize(*mean_std)])

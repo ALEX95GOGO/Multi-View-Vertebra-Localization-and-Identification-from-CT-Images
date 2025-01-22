@@ -30,6 +30,7 @@ def compute_sequence_loss(output, target, class_num = 24, inference = False):
     output = output.squeeze()
     output = torch.softmax(output, dim=0)
     id_list = torch.unique(target)[1:]
+    
     for i,id in enumerate(id_list):
         index = (target==id)
         id_output = output * index
@@ -45,7 +46,7 @@ def compute_sequence_loss(output, target, class_num = 24, inference = False):
             probability = probability.unsqueeze(0)
         else:
             probability = torch.cat((probability, torch.mean(tmp, dim=1).unsqueeze(0)), dim = 0)
-
+    
     for i in range(len(id_list)):
         for j in range(class_num):
             if j > 1 and i > 0:
@@ -103,7 +104,8 @@ def get_model(model_name, number_class, use_contrastive_learning, contrastive_le
     else:
         if use_contrastive_learning:
             print(f'-----load contrastive learning params from {contrastive_learning_path}-----')
-            model = UNetWithResnet50Encoder(1, number_class)
+            #model = UNetWithResnet50Encoder(1, number_class)
+            model = UNetWithResnet50Encoder(number_class)
             pretrained_dict = torch.load(contrastive_learning_path)['net']
             model_dict = model.state_dict()
             common_dict = {}
@@ -115,14 +117,15 @@ def get_model(model_name, number_class, use_contrastive_learning, contrastive_le
             model.load_state_dict(model_dict)
         elif read_params:
             print(f'-----load trained params from {params_path}-----')
-            model = UNetWithResnet50Encoder(1, number_class)
+            #model = UNetWithResnet50Encoder(1, number_class)
+            model = UNetWithResnet50Encoder(number_class)
             pretrained_dict = torch.load(params_path)['net']
             model_dict = model.state_dict()
             pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
             model_dict.update(pretrained_dict)
             model.load_state_dict(model_dict)
         else:
-             model = UNetWithResnet50Encoder(1, number_class)
+             model = UNetWithResnet50Encoder(number_class)
     return model
 
 parser = argparse.ArgumentParser(description='Identification training')
@@ -132,12 +135,12 @@ parser.add_argument('-epochs',                      default=100,        type=int
 parser.add_argument('-eval_epoch',                  default=1,          type=int,   help='evaluation epoch')
 parser.add_argument('-log_path',                    default="logs",     type=str,   help='the path of the log') 
 parser.add_argument('-log_inter',                   default=50,         type=int,   help='log interval')
-parser.add_argument('-use_contrastive_learning',    default=True,       type=bool,  help='if use contrastive_learning as pretrained')
+parser.add_argument('-use_contrastive_learning',    default=False,       type=bool,  help='if use contrastive_learning as pretrained')
 parser.add_argument('-contrastive_learning_path',   default="",         type=str,   help='the path of the pretrained model')
 parser.add_argument('-read_params',                 default=False,      type=bool,  help='if read pretrained params')
 parser.add_argument('-params_path',                 default="",         type=str,   help='the path of the pretrained model')
 parser.add_argument('-basepath',                    default="",         type=str,   help='base dataset path')
-parser.add_argument('-augmentation',                default=False,      type=bool,  help='if augmentation')
+parser.add_argument('-augmentation',                default=True,      type=bool,  help='if augmentation')
 parser.add_argument('-num_class',                   default=25,         type=int,   help='the number of class')
 parser.add_argument('-model_name',                  default="",         type=str,   help='ResUnet or FCN')
 
@@ -167,12 +170,12 @@ if __name__=="__main__":
     save_path = args.log_path
     writer = SummaryWriter(save_path+save_name)
 
-    base_train_path = args.basepath + "train/"
-    base_test_path = args.basepath + "test/"
+    base_train_path = args.basepath + "dataset-verse19training/enhance_drr/"
+    base_test_path = args.basepath + "dataset-verse19validation/enhance_drr"
     train = id_as_seg_dataset(drr_path=base_train_path, mode="train", if_deformation=if_deformation, transform=None)
     test = id_as_seg_dataset(drr_path=base_test_path, mode="test",if_deformation=False)
     trainset = DataLoader(dataset=train, batch_size=batch_size, shuffle = False)
-    testset = DataLoader(dataset=test, batch_size=1, shuffle = False)
+    testset = DataLoader(dataset=test, batch_size=batch_size, shuffle = False)
 
     start_epoch = 0
     model = get_model(args.model_name, number_class, contrastive_learning, contrastive_learning_path, read_params, params_path)
@@ -195,12 +198,13 @@ if __name__=="__main__":
         for i, (data, target) in enumerate(trainset):
             optimizer.zero_grad()
             data = data.cuda()
-            target = target.long().cuda()
-            output = model(data)['out']
-            
+            target = target.float().cuda()
+            output = model(data)['out'] 
             dg_index = (target > 0)
-            ce_loss = loss_func_1(output, target)[dg_index].mean()
+            
+            ce_loss = loss_func_1(output, target.long())[dg_index].mean()
             sequence_loss = compute_sequence_loss(output, target)
+            #sequence_loss = torch.tensor([0]).cuda()
             loss = ce_loss + sequence_loss
 
             loss.backward()
@@ -229,18 +233,20 @@ if __name__=="__main__":
             with torch.no_grad():
                 for i, (data, target) in enumerate(testset):
                     data = data.cuda()
-                    target = target.long().cuda()
+                    target = target.float().cuda()
                     output = model(data)['out']
-                    
                     dg_index = (target > 0)
-                    ce_loss = loss_func_1(output, target)[dg_index].mean()
+                    ce_loss = loss_func_1(output, target.long())[dg_index].mean()
                     sequence_loss = compute_sequence_loss(output, target)
+                    #sequence_loss = torch.tensor([0]).cuda()
+
                     loss = ce_loss + sequence_loss
 
                     testing_sequence_loss += sequence_loss.item()
                     testing_CE_loss += ce_loss.item()
                     testing_all_loss += loss.item()
                     acc += get_acc(output,target, dg_index)
+                    
                 tqdm.write(f"[*]eval on test finish, loss is: {testing_all_loss/(i+1):.8f}, CE loss: {testing_CE_loss/(i+1):.8f}, seq loss: {testing_sequence_loss/(i+1):.8f}, acc is {100*acc/(i+1):.3f}%")
                 writer.add_scalar('Eval on Test All Loss', testing_all_loss / (i+1), epoch)
                 writer.add_scalar('Eval on Test CE Loss', testing_CE_loss / (i+1), epoch)

@@ -42,6 +42,7 @@ class id_as_seg_dataset(dataset):
         
         centroids_file = open(self.data[index][1],'r')
         centroids = centroids_file.readlines()
+        
         ids = self.data[index][2]
         ids = ids.split("[")[1]
         ids = ids.split("]")[0]
@@ -132,12 +133,14 @@ class id_as_seg_dataset(dataset):
             file_all = os.path.join(self.drr_path,folder, "heatmap")
             file_list = os.listdir(file_all)
             file_list.sort()
+            
             for file in file_list:
                 if (file[-3:] == "txt"):
                     file_path = os.path.join(file_all, file)
                     label_all.append(file_path)
 
         txt_file = open(txt_name,'w')
+        
         for i in range(len(nii_all)): 
             txt_file.writelines(nii_all[i] + "*" + str(label_all[i]) + "*" + str(ids_all[i//10]) + "\n")
         txt_file.close()

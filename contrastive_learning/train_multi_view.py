@@ -53,8 +53,9 @@ parser.add_argument('-log_path', default="simsiam", type=str, help='the path of 
 if __name__=="__main__":
     args = parser.parse_args()
 
-    base_path = "/public_bme/data/wuhan/spine/dataset/drr/"
-    
+    base_path = "/projects/MAD3D/Zhuoli/MICCAI/VerSe2019/dataset-verse19training/enhance_drr/"
+    validation_base_path = "/projects/MAD3D/Zhuoli/MICCAI/VerSe2019/dataset-verse19validation/enhance_drr/"
+
     lr = args.lr
     batch_size = args.batch_size
     init_lr = lr * batch_size / 256
@@ -78,8 +79,8 @@ if __name__=="__main__":
     
     
     mean_std = [[0.456,0.456,0.456], [0.224,0.224,0.224]]
-    train_data = multi_view_dataset(mode="train", mean_std=mean_std, n_views=args.n_views)
-    test_data = multi_view_dataset(mode="eval", mean_std=mean_std, n_views=args.n_views)
+    train_data = multi_view_dataset(drr_path=base_path, mode="train", mean_std=mean_std, n_views=args.n_views)
+    test_data = multi_view_dataset(drr_path=validation_base_path, mode="eval", mean_std=mean_std, n_views=args.n_views)
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=batch_size)
     

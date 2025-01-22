@@ -1,0 +1,6 @@
+checkpoints_identification/
+checkpoints_localization/
+contrastive_learning/checkpoints/
+contrastive_learning/logs/
+
+**/__pycache__/
