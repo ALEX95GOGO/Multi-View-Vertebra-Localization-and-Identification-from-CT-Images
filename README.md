@@ -48,8 +48,12 @@ preprocess/generate_drr.py
 4. Multi-View Fusion
 5. Evaluation
 ```c
-# 3-5 are all in eval_all.py
-eavl/eval_all.py
+# Evaluate localization, it will save the heatmap prediction
+eval/eval_localization.py
+# 3-5 are all in eval_all.py evalute identification, it will save the prediction as a json file
+eval/eval_all.py
+# calculate metrics using gt json and prediction json file
+eval/calculate_metrics.py
 ```
 ## Data Link
 Public dataset:
